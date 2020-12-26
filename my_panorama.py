@@ -16,7 +16,7 @@ def main():
     panorama_generator = sol4.PanoramicVideoGenerator('dump/%s/' %exp_no_ext, exp_no_ext, 500)
 
 
-    panorama_generator.align_images(translation_only='boat' in experiment)
+    panorama_generator.align_images(translation_only='my_panorama' in experiment)
     panorama_generator.generate_panoramic_images(9)
     print(' time for %s: %.1f' % (exp_no_ext, time.time() - s))
 
