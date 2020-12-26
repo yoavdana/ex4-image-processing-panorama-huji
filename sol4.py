@@ -33,12 +33,27 @@ def harris_corner_detector(im):
   return corne_position
 
 def harris_mat(I_x,I_y,kernel_size):
+  """
+  genreate the harris matrix
+  :param I_x:
+  :param I_y:
+  :param kernel_size:
+  :return: harris matrix elements
+  """
   I_x2=sol4_utils.blur_spatial(I_x**2, kernel_size)
   I_y2 = sol4_utils.blur_spatial(I_y**2, kernel_size)
   I_yx=sol4_utils.blur_spatial(I_y*I_x, kernel_size)
   return I_x2,I_y2,I_yx
 
 def find_R(I_x2,I_y2,I_yx,k):
+  """
+  calculate Response image
+  :param I_x2:
+  :param I_y2:
+  :param I_yx:
+  :param k:
+  :return: R
+  """
   det=I_x2*I_y2-I_yx**2
   trace=I_x2+I_y2
   return det-k*trace**2
@@ -69,13 +84,17 @@ def sample_descriptor(im, pos, desc_rad):
     x, y = np.indices((K, K)).astype(np.float64)
     x -= desc_rad - pos[i, 1]
     y -= desc_rad - pos[i, 0]
-    descriptors[i, :, :] = map_coordinates(im, [x.flatten(), y.flatten()],
-                                           order=1, prefilter=False).reshape((K, K))
+    descriptors[i,:,:] = map_coordinates(im, [x.flatten(), y.flatten()],order=1, prefilter=False).reshape((K, K))
     descriptors[i, :, :] =normalize(descriptors[i, :, :])
   return descriptors
 
 
 def normalize(window):
+  """
+  normlize the window
+  :param window:
+  :return: normlize window
+  """
   mean = np.mean(window)
   norm= np.linalg.norm(window - mean)
   if norm>0:
@@ -101,6 +120,9 @@ def find_features(pyr):
   return cordinates,descriptors
 
 
+
+
+
 def match_features(desc1, desc2, min_score):
   """
   Return indices of matching descriptors.
@@ -111,30 +133,44 @@ def match_features(desc1, desc2, min_score):
               1) An array with shape (M,) and dtype int of matching indices in desc1.
               2) An array with shape (M,) and dtype int of matching indices in desc2.
   """
-  k=np.shape(desc1[1])[1]
-  sjk_mat=np.dot(desc1[1].reshape(-1,k**2),desc2[1].reshape(-1,
-                                                            k**2).T)#bulid
-  # the matrix
-  max_rows_ind = np.arange(np.shape(sjk_mat)[0])
-  max_rows=np.zeros((1,np.shape(sjk_mat)[0]))
-  max_cols_ind = np.arange(np.shape(sjk_mat)[1])
-  max_cols = np.zeros((1, np.shape(sjk_mat)[1]))
-  #max_rows[max_rows_ind]=np.unique(sjk_mat[max_rows_ind,:])[-2]
-  max_cols =  np.unique(sjk_mat[, :])[-2]
-  max_cols[max_rows_ind] = \
-  np.partition(sjk_mat[max_cols_ind, :].flatten(), -2)[-2]
+  k_biggest=2
+  k=np.shape(desc1[1])[0]
+  sjk_mat=np.dot(desc1.reshape(-1,k**2),desc2.reshape(-1,k**2).T)#bulid the matrix
+  min_score_demand = sjk_mat > min_score #a bool matrix(True>min_score else Fales
+  N1,N2=[desc1.shape[0], desc2.shape[0]]#dims of sjk matrix
+  matched_array=np.zeros((N1,N2))#array that will contain all good values
+  for row in range(N1):#loop every row calculate the 2 max values
+    max_in = np.argpartition(sjk_mat[row, :],-k_biggest)[-k_biggest:]
+    matched_array[row,max_in]+=1#add 1 to the matrix element
 
+  for col in range(N2):#loop every col calculate the 2 max values
+    max_in = np.argpartition(sjk_mat[:,col],-k_biggest)[-k_biggest:]
+    matched_array[max_in,col] += 1
+
+  matched_array=matched_array ==k_biggest #the element on the zero matrix
+  # that equale 2,will turn to true(that means that they passed 2 of the
+  # requirments
+  matched_array=matched_array * min_score_demand#multiply to bool matrix
+  # will give as the min score requirment
+
+  return np.where(matched_array)
 
 
 def apply_homography(pos1, H12):
   """
   Apply homography to inhomogenous points.
-  :param pos1: An array with shape (N,2) of [x,y] point coordinates.
+  :param pos1: An array with shapply_homography(pos1, H12)ape (N,2) of [x,y] point coordinates.
   :param H12: A 3x3 homography matrix.
   :return: An array with the same shape as pos1 with [x,y] point coordinates obtained from transforming pos1 using H12.
   """
-  pass
-
+  N=np.shape(pos1)[0]
+  d3_pos1=np.ones((N,3))
+  d3_pos1[:,0:2]=pos1 #build the homogenious coordintaes
+  pos_vectors = d3_pos1.T #transpose to perfurme multiplycation
+  tranformd= np.dot(H12, pos_vectors).T.reshape(d3_pos1.shape) #the new homoginioud cords
+  inv=(1/tranformd[:,2]).reshape(np.shape(tranformd)[0],1)
+  new_cords=(tranformd[:,0:2]*inv).reshape(pos1.shape)
+  return new_cords
 
 def ransac_homography(points1, points2, num_iter, inlier_tol, translation_only=False):
   """
@@ -149,7 +185,56 @@ def ransac_homography(points1, points2, num_iter, inlier_tol, translation_only=F
               2) An Array with shape (S,) where S is the number of inliers,
                   containing the indices in pos1/pos2 of the maximal set of inlier matches found.
   """
-  pass
+  shuffled =np.random.choice(np.arange(points1.shape[0]),size=num_iter+1,replace=True)
+  best_inliers=np.array([])
+  if translation_only==False:
+    for i in range(num_iter):
+      point1=np.array([points1[shuffled[i]],points1[shuffled[i+1]]]).reshape(2,2)
+      point2 = np.array([points2[shuffled[i]],points2[shuffled[i+1]]]).reshape(2,2)
+      curr_inliers = find_inliers(inlier_tol, point1, point2, points1,points2,translation_only)
+      if curr_inliers.size > best_inliers.size:
+          best_inliers = curr_inliers
+  else:
+    for i in range(num_iter):
+      point1 = np.array([points1[shuffled[i]]]).reshape(1,2)
+      point2 = np.array([points2[shuffled[i]]]).reshape(1,2)
+      curr_inliers = find_inliers(inlier_tol, point1, point2, points1,points2, translation_only)
+      if curr_inliers.size > best_inliers.size:
+        best_inliers = curr_inliers
+  if len(best_inliers)!=0:
+    Homog = estimate_rigid_transform(points1[best_inliers,:],points2[best_inliers,:],translation_only)
+    return  [Homog,best_inliers]
+  return [[],best_inliers]
+
+def find_inliers(inlier_tol, point1, point2, points1, points2,translation_only):
+  """
+  find the inliers from a set of points
+  :param inlier_tol:
+  :param point1:
+  :param point2:
+  :param points1:
+  :param points2:
+  :param translation_only:
+  :return: inliers array
+  """
+  H12 = estimate_rigid_transform(point1, point2, translation_only)
+  point2_tr = apply_homography(points1, H12)
+  E = (np.linalg.norm(point2_tr - points2, axis=1))
+  curr_inlaiers = np.where(E < inlier_tol)
+  return curr_inlaiers[0]
+
+
+def lines(pos1, pos2, color, line_width):
+  """
+  plot the lines between dots
+  :param pos1: points of im 1
+  :param pos2:  points of im 2
+  :param color: color of the line
+  :param line_width: width of the line
+  """
+  for i in range(pos1.shape[0]):
+    po1,po2= [[pos1[i, 0], pos2[i, 0]],[pos1[i, 1], pos2[i, 1]]]
+    plt.plot(po1,po2, color + "-", lw=line_width)
 
 
 def display_matches(im1, im2, points1, points2, inliers):
@@ -161,9 +246,18 @@ def display_matches(im1, im2, points1, points2, inliers):
   :param pos2: An aray shape (N,2), containing N rows of [x,y] coordinates of matched points in im2.
   :param inliers: An array with shape (S,) of inlier matches.
   """
-  pass
-
-
+  back_round = np.hstack((im1, im2))
+  points2_moved = points2.copy()
+  points2_moved[:, 0] += im1.shape[1]
+  full_points = np.vstack((points1, points2_moved))
+  point1_inliers = points1[inliers, :]
+  point2_inliers = points2_moved[inliers, :]
+  # plotting
+  plt.plot(full_points[:, 0], full_points[:, 1], 'ro', markersize=1.5)
+  plt.imshow(back_round, cmap='gray')  # plot the combined image
+  lines(points1, points2_moved, "b", 0.4)  # plot the lines of out liners
+  lines(point1_inliers, point2_inliers, "y", 0.6)  # plot the inliers lines
+  plt.show()
 
 def accumulate_homographies(H_succesive, m):
   """
@@ -177,7 +271,32 @@ def accumulate_homographies(H_succesive, m):
   :return: A list of M 3x3 homography matrices, 
     where H2m[i] transforms points from coordinate system i to coordinate system m
   """ 
-  pass
+  H2m=[]
+  for i in range(len(H_succesive)+1):
+    if i<m:
+       H2m.append(smaller_than_m(H_succesive,m,i))
+    elif i>m:
+      H2m.append(bigger_than_m(H_succesive, m, i))
+    else:
+      H2m.append(np.eye(3))
+  return H2m
+
+def bigger_than_m(H_succesive, m, i):
+  Homog =np.eye(3)
+  for j in range(m,i):
+      Homog=np.matmul(Homog,np.linalg.inv(H_succesive[j]))
+  return normalize_H(Homog)
+
+def smaller_than_m(H_succesive,m,i):
+  Homog = np.eye(3)
+  for j in range(m-1,i-1,-1):
+      Homog=np.matmul(Homog,H_succesive[j])
+  return normalize_H(Homog)
+
+def normalize_H(H):
+  H=H.astype('float64')
+  H /= H[2,2]
+  return H
 
 
 def compute_bounding_box(homography, w, h):
@@ -189,7 +308,14 @@ def compute_bounding_box(homography, w, h):
   :return: 2x2 array, where the first row is [x,y] of the top left corner,
    and the second row is the [x,y] of the bottom right corner
   """
-  pass
+  points=np.array([[0,0],[w-1,0],[0,h-1],[w-1,h-1]])
+  new_points=np.round(apply_homography(points, homography)).astype('int')
+  x_sort = np.sort(new_points[:,0], axis=0)
+  y_sort = np.sort(new_points[:,1], axis=0)
+  top_left_corn=[x_sort[0],y_sort[0]]
+  bottom_rghit_corn=[x_sort[-1],y_sort[-1]]
+  return np.array([top_left_corn,bottom_rghit_corn])
+
 
 
 def warp_channel(image, homography):
@@ -199,9 +325,15 @@ def warp_channel(image, homography):
   :param homography: homograhpy.
   :return: A 2d warped image.
   """
-  pass
-
-
+  hight,width=np.shape(image)
+  [[x_min,y_min],[x_max,y_max]]=compute_bounding_box(homography,width,hight)
+  x_cords,y_cords=[np.arange(x_min,x_max+1),np.arange(y_min,y_max+1)]
+  Xi,Yi=np.meshgrid(x_cords,y_cords)
+  positions = np.vstack([Xi.ravel(), Yi.ravel()]).T
+  new_cords=apply_homography(positions,np.linalg.inv(homography)).reshape(Xi.shape[0],Xi.shape[1],2)
+  Xi_t,Yi_t=new_cords[:,:,0],new_cords[:,:,1]
+  new_image=map_coordinates(image, [Yi_t, Xi_t], order=1, prefilter=False)
+  return new_image
 def warp_image(image, homography):
   """
   Warps an RGB image with a given homography.
@@ -439,6 +571,8 @@ class PanoramicVideoGenerator:
     # save individual panorama images to 'tmp_folder_for_panoramic_frames'
     for i, panorama in enumerate(self.panoramas):
       imwrite('%s/panorama%02d.png' % (out_folder, i + 1), panorama)
+
+
     if os.path.exists('%s.mp4' % self.file_prefix):
       os.remove('%s.mp4' % self.file_prefix)
     # write output video to current folder
@@ -451,19 +585,5 @@ class PanoramicVideoGenerator:
     plt.figure(figsize=figsize)
     plt.imshow(self.panoramas[panorama_index].clip(0, 1))
     plt.show()
-im1=sol4_utils.read_image('external/oxford1.jpg',1)
-im2=sol4_utils.read_image('external/oxford2.jpg',1)
-pyr1=sol4_utils.build_gaussian_pyramid(im1,3,3)[0]
-pyr2=sol4_utils.build_gaussian_pyramid(im2,3,3)[0]
-desc1=find_features(pyr1)
-desc2=find_features(pyr2)
-match_features(desc1, desc2, 0.5)
-#im=np.ones((1024,1024))*255
-#new_im=harris_corner_detector(im)
-#print(new_im)
-#new_im=spread_out_corners(im,7, 7, 5)
-#plt.figure()
-#plt.imshow(im,cmap='gray')
-#plt.plot(new_im[:,0],new_im[:,1],'.',markersize=3)
-#plt.show()
-#print(new_im[:,0])
+
+
