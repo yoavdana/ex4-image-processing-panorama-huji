@@ -35,7 +35,7 @@ def harris_corner_detector(im):
 def harris_mat(I_x,I_y,kernel_size):
   """
   genreate the harris matrix
-  :param I_x:
+  :param I_x:#x deriviatives
   :param I_y:
   :param kernel_size:
   :return: harris matrix elements
