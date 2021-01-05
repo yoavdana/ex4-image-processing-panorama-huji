@@ -219,7 +219,7 @@ def find_inliers(inlier_tol, point1, point2, points1, points2,translation_only):
   """
   H12 = estimate_rigid_transform(point1, point2, translation_only)
   point2_tr = apply_homography(points1, H12)
-  E = (np.linalg.norm(point2_tr - points2, axis=1))
+  E = (np.linalg.norm(point2_tr - points2, axis=1))**2
   curr_inlaiers = np.where(E < inlier_tol)
   return curr_inlaiers[0]
 
