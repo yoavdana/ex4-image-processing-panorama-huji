@@ -59,7 +59,7 @@ def build_filter(filter_size):
 
 def filter_(im,filter,expand_or_reduce):
     """
-    apply the convolution with the filter
+    #apply the convolution with the filter
     :param im:
     :param filter:
     :param expand_or_reduce:
