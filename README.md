@@ -14,3 +14,5 @@ between the pair and fitting a rigid transformation that agrees with a large set
 using the RANSAC algorithm.
 • Stitching: Combining strips from aligned images into a sequence of panoramas. Global motion will
 be compensated, and the residual parallax, as well as other motions will become visible.
+
+The main file is sol4.py,an additional file named sol4_utils.py including more functions for the implementaion. 
