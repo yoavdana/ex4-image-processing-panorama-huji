@@ -1,4 +1,6 @@
-
+# Initial code for ex4.
+# You may change this code, but keep the functions' signatures
+# You can also split the code to multiple files as long as this file's API is unchanged 
 
 import numpy as np
 import os
@@ -33,7 +35,7 @@ def harris_corner_detector(im):
 def harris_mat(I_x,I_y,kernel_size):
   """
   genreate the harris matrix
-  :param I_x:#x deriviatives
+  :param I_x:#x derivatives
   :param I_y:
   :param kernel_size:
   :return: harris matrix elements
