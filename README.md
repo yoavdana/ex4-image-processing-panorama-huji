@@ -5,7 +5,7 @@ my_panorama.py
 videos
 videos/my_panorama.mp4
 
-In this project i performed all the steps to create automatic ”Stereo
+This project is a part from image processing course, i performed all the steps to create automatic ”Stereo
 Mosaicking”(panoramic image). The input of such an algorithm is a sequence of images scanning a scene from left to right
 (due to camera rotation and/or translation - we assume rigid transform between images), with significant
 overlap in the field of view of consecutive frames. This project covers the following steps:
